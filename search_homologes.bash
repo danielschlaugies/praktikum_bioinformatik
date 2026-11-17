@@ -9,7 +9,7 @@ Runs a homologe search using RNAHub (and nhmmer implicitly).
 The alignment of homologes and additional files created by RNAHub are stored in the current directory.
 
 Options:
-  -i FILE   input Stockholm alignment
+  -i FILE   query fasta file
   -h        show this help
 EOF
 }
