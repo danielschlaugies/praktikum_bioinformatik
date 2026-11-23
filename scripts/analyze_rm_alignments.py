@@ -390,7 +390,6 @@ def analyze_target(
             "--slide",
             str(WINDOW_SLIDE),
             "--no-reference",
-            "--no-rangecheck",
             "--max-seqs",
             str(MAX_SEQUENCES),
             "--opt-id",
