@@ -84,7 +84,10 @@ def parse_rnaz_report(
     allowed_windows: set[tuple[int, int]],
 ) -> list[RnazCandidate]:
     report = report_path.read_text()
-    chunks = re.split(r"#+\s+RNAz 2\.1\.1\s+#+", report)
+    chunks = re.split(
+        r"#+\s+RNAz\s+2\.1(?:\.\d+)?\s+#+",
+        report,
+    )
     candidates: list[RnazCandidate] = []
 
     for chunk in chunks:
