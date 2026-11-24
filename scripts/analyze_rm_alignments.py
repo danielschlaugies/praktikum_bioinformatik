@@ -442,14 +442,14 @@ def analyze_target(
             rscape_dir = candidate_dir / "rscape_cacofold"
             rscape_dir.mkdir(parents=True, exist_ok=True)
             try:
-                # rnazWindow reports zero-based inclusive coordinates, while
-                # R-scape expects one-based inclusive alignment positions.
-                rscape_start = candidate.start + 1
-                rscape_end = candidate.end + 1
+                # rnazWindow/RNAz report one-based inclusive alignment
+                # coordinates, matching R-scape's --tstart/--tend.
+                rscape_start = candidate.start
+                rscape_end = candidate.end
                 write_text(
                     candidate_dir / "coordinates.txt",
                     (
-                        f"RNAz/rnazWindow coordinates (0-based inclusive): "
+                        f"RNAz/rnazWindow coordinates (1-based inclusive): "
                         f"{candidate.start}-{candidate.end}\n"
                         f"R-scape coordinates (1-based inclusive): "
                         f"{rscape_start}-{rscape_end}\n"
