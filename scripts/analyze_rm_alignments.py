@@ -184,55 +184,6 @@ def select_positive_window_winners(
     )
 
 
-def preprocess_candidate(
-    source_alignment: Path,
-    start: int,
-    end: int,
-    candidate_alignment: Path,
-    gap_threshold: float,
-) -> str:
-    extracted = run_tool(
-        [
-            tool("esl-alimask"),
-            "-t",
-            "--rna",
-            "--outformat",
-            "stockholm",
-            str(source_alignment),
-            f"{start}..{end}",
-        ]
-    )
-
-    sequences_removed = run_tool(
-        [tool("esl-alimanip"), "--lmin", "1", "-"],
-        input_text=extracted,
-    )
-
-    gap_filtered = run_tool(
-        [
-            tool("esl-alimask"),
-            "-g",
-            "--gapthresh",
-            str(gap_threshold),
-            "--rna",
-            "--outformat",
-            "stockholm",
-            "-",
-        ],
-        input_text=sequences_removed,
-    )
-
-    sequences_removed_again = run_tool(
-        [tool("esl-alimanip"), "--lmin", "1", "-"],
-        input_text=gap_filtered,
-    )
-
-    write_text(candidate_alignment, sequences_removed_again)
-    return run_tool(
-        [tool("esl-alistat"), "--rna", str(candidate_alignment)]
-    )
-
-
 def parse_rscape_record(
     rscape_dir: Path,
     candidate_name: str,
@@ -248,8 +199,11 @@ def parse_rscape_record(
         "coding_flags": "rna,cacofold",
     }
 
-    sorted_cov = rscape_dir / f"{candidate_name}.sorted.cacofold.cov"
-    if sorted_cov.is_file():
+    sorted_cov_candidates = sorted(
+        rscape_dir.glob(f"{candidate_name}*.sorted.cacofold.cov")
+    )
+    if sorted_cov_candidates:
+        sorted_cov = sorted_cov_candidates[0]
         text = sorted_cov.read_text()
         lines = [
             line for line in text.splitlines()
@@ -283,8 +237,11 @@ def parse_rscape_record(
         if powers:
             record["mean_power"] = f"{sum(powers) / len(powers):.6f}"
 
-    power_file = rscape_dir / f"{candidate_name}.cacofold.power"
-    if power_file.is_file():
+    power_candidates = sorted(
+        rscape_dir.glob(f"{candidate_name}*.cacofold.power")
+    )
+    if power_candidates:
+        power_file = power_candidates[0]
         text = power_file.read_text()
         expected_match = re.search(
             r"# BPAIRS expected to covary\s+([0-9.]+)",
@@ -365,7 +322,6 @@ def analyze_target(
     target_dir: Path,
     rna_cutoff: float,
     rscape_evalue: float,
-    gap_threshold: float,
     jobs: int = 1,
 ) -> tuple[list[RnazCandidate], list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     alignment = target_dir / "v3_rm.sto"
@@ -462,7 +418,6 @@ def analyze_target(
             f"window_{candidate.start}-{candidate.end}_{candidate.direction}"
         )
         candidate_dir: Path | None = None
-        candidate_alignment: Path | None = None
         rscape_dir: Path | None = None
 
         rscape_status = "not_run"
@@ -482,18 +437,22 @@ def analyze_target(
         if screen_class == "rnaz_positive":
             candidate_dir = output_dir / candidate_name
             candidate_dir.mkdir(parents=True, exist_ok=True)
-            candidate_alignment = candidate_dir / f"{candidate_name}.sto"
             rscape_dir = candidate_dir / "rscape_cacofold"
             rscape_dir.mkdir(parents=True, exist_ok=True)
             try:
-                candidate_stats = preprocess_candidate(
-                    alignment,
-                    candidate.start,
-                    candidate.end,
-                    candidate_alignment,
-                    gap_threshold,
+                # rnazWindow reports zero-based inclusive coordinates, while
+                # R-scape expects one-based inclusive alignment positions.
+                rscape_start = candidate.start + 1
+                rscape_end = candidate.end + 1
+                write_text(
+                    candidate_dir / "coordinates.txt",
+                    (
+                        f"RNAz/rnazWindow coordinates (0-based inclusive): "
+                        f"{candidate.start}-{candidate.end}\n"
+                        f"R-scape coordinates (1-based inclusive): "
+                        f"{rscape_start}-{rscape_end}\n"
+                    ),
                 )
-                write_text(candidate_dir / "esl-alistat.txt", candidate_stats)
                 run_tool(
                     [
                         tool("R-scape"),
@@ -501,11 +460,15 @@ def analyze_target(
                         "--rna",
                         "-E",
                         str(rscape_evalue),
+                        "--tstart",
+                        str(rscape_start),
+                        "--tend",
+                        str(rscape_end),
                         "--outdir",
                         str(rscape_dir),
                         "--outname",
                         candidate_name,
-                        str(candidate_alignment),
+                        str(alignment),
                     ]
                 )
                 rscape_status = "completed"
@@ -618,12 +581,6 @@ def main() -> int:
         help="R-scape E-value target",
     )
     parser.add_argument(
-        "--gap-threshold",
-        type=float,
-        default=0.5,
-        help="Maximum fraction of gaps allowed in a column during RNAz-hit preprocessing (default: 0.5)",
-    )
-    parser.add_argument(
         "--jobs",
         type=int,
         default=1,
@@ -632,8 +589,6 @@ def main() -> int:
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
-    if not 0.0 <= args.gap_threshold <= 1.0:
-        parser.error("--gap-threshold must be between 0 and 1")
 
     try:
         targets = discover_targets(args.root.resolve(), args.target)
@@ -652,7 +607,6 @@ def main() -> int:
             target,
             args.rna_cutoff,
             args.rscape_evalue,
-            args.gap_threshold,
             args.jobs,
         )
 
