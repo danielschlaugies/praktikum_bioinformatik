@@ -323,6 +323,8 @@ def analyze_target(
     rna_cutoff: float,
     rscape_evalue: float,
     jobs: int = 1,
+    window_size: int = WINDOW_SIZE,
+    window_slide: int = WINDOW_SLIDE,
 ) -> tuple[list[RnazCandidate], list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     alignment = target_dir / "v3_rm.sto"
     if not alignment.is_file():
@@ -345,9 +347,9 @@ def analyze_target(
         [
             tool("rnazWindow.pl"),
             "--window",
-            str(WINDOW_SIZE),
+            str(window_size),
             "--slide",
-            str(WINDOW_SLIDE),
+            str(window_slide),
             "--no-reference",
             "--max-seqs",
             str(MAX_SEQUENCES),
@@ -581,6 +583,18 @@ def main() -> int:
         help="R-scape E-value target",
     )
     parser.add_argument(
+        "--window-size",
+        type=int,
+        default=WINDOW_SIZE,
+        help="Nucleotide window size for rnazWindow.pl",
+    )
+    parser.add_argument(
+        "--slide",
+        type=int,
+        default=WINDOW_SLIDE,
+        help="Nucleotide slide size for rnazWindow.pl",
+    )
+    parser.add_argument(
         "--jobs",
         type=int,
         default=1,
@@ -589,6 +603,10 @@ def main() -> int:
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
+    if args.window_size < 1:
+        parser.error("--window-size must be at least 1")
+    if args.slide < 1:
+        parser.error("--slide must be at least 1")
 
     try:
         targets = discover_targets(args.root.resolve(), args.target)
@@ -608,6 +626,8 @@ def main() -> int:
             args.rna_cutoff,
             args.rscape_evalue,
             args.jobs,
+            args.window_size,
+            args.slide,
         )
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
