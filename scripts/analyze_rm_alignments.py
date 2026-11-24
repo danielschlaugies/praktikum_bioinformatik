@@ -328,6 +328,7 @@ def analyze_target(
     window_slide: int = WINDOW_SLIDE,
     min_sequences: int = MIN_SEQUENCES,
     max_sequences: int = MAX_SEQUENCES,
+    opt_identity: float = OPT_IDENTITY,
 ) -> tuple[list[RnazCandidate], list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     alignment = target_dir / "v3_rm.sto"
     if not alignment.is_file():
@@ -359,7 +360,7 @@ def analyze_target(
             "--max-seqs",
             str(max_sequences),
             "--opt-id",
-            str(OPT_IDENTITY),
+            str(opt_identity),
             str(clustal_alignment),
         ],
         text=True,
@@ -612,6 +613,12 @@ def main() -> int:
         help="Maximum number of sequences per rnazWindow.pl window (default: 6)",
     )
     parser.add_argument(
+        "--opt-id",
+        type=float,
+        default=OPT_IDENTITY,
+        help="Target mean pairwise identity percentage for rnazWindow.pl (0-100; default: 60)",
+    )
+    parser.add_argument(
         "--jobs",
         type=int,
         default=1,
@@ -628,6 +635,8 @@ def main() -> int:
         parser.error("--min-seqs must be at least 1")
     if args.max_seqs < 1:
         parser.error("--max-seqs must be at least 1")
+    if not 0 <= args.opt_id <= 100:
+        parser.error("--opt-id must be between 0 and 100")
 
     try:
         targets = discover_targets(args.root.resolve(), args.target)
@@ -651,6 +660,7 @@ def main() -> int:
             args.slide,
             args.min_seqs,
             args.max_seqs,
+            args.opt_id,
         )
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
