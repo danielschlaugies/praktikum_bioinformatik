@@ -11,8 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-WINDOW_SIZE = 120
-WINDOW_SLIDE = 40
+WINDOW_SIZE = 200
+WINDOW_SLIDE = 20
+MIN_SEQUENCES = 4
 MAX_SEQUENCES = 6
 OPT_IDENTITY = 60
 
@@ -325,6 +326,7 @@ def analyze_target(
     jobs: int = 1,
     window_size: int = WINDOW_SIZE,
     window_slide: int = WINDOW_SLIDE,
+    min_sequences: int = MIN_SEQUENCES,
 ) -> tuple[list[RnazCandidate], list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
     alignment = target_dir / "v3_rm.sto"
     if not alignment.is_file():
@@ -351,6 +353,8 @@ def analyze_target(
             "--slide",
             str(window_slide),
             "--no-reference",
+            "--min-seqs",
+            str(min_sequences),
             "--max-seqs",
             str(MAX_SEQUENCES),
             "--opt-id",
@@ -586,13 +590,19 @@ def main() -> int:
         "--window-size",
         type=int,
         default=WINDOW_SIZE,
-        help="Nucleotide window size for rnazWindow.pl",
+        help="Nucleotide window size for rnazWindow.pl (default: 200)",
     )
     parser.add_argument(
         "--slide",
         type=int,
         default=WINDOW_SLIDE,
-        help="Nucleotide slide size for rnazWindow.pl",
+        help="Nucleotide slide size for rnazWindow.pl (default: 20)",
+    )
+    parser.add_argument(
+        "--min-seqs",
+        type=int,
+        default=MIN_SEQUENCES,
+        help="Minimum number of sequences per rnazWindow.pl window (default: 4)",
     )
     parser.add_argument(
         "--jobs",
@@ -607,6 +617,8 @@ def main() -> int:
         parser.error("--window-size must be at least 1")
     if args.slide < 1:
         parser.error("--slide must be at least 1")
+    if args.min_seqs < 1:
+        parser.error("--min-seqs must be at least 1")
 
     try:
         targets = discover_targets(args.root.resolve(), args.target)
@@ -628,6 +640,7 @@ def main() -> int:
             args.jobs,
             args.window_size,
             args.slide,
+            args.min_seqs,
         )
 
     with ThreadPoolExecutor(max_workers=args.jobs) as executor:
